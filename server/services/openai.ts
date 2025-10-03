@@ -22,7 +22,7 @@ export async function generateImage(params: GenerateImageParams): Promise<ImageG
     
     if (params.musicContext) {
       const enhancementResponse = await openai.chat.completions.create({
-        model: "gpt-5",
+        model: "gpt-4o",
         messages: [
           {
             role: "system",
@@ -64,7 +64,7 @@ export async function generateImage(params: GenerateImageParams): Promise<ImageG
 export async function enhanceMusicPrompt(prompt: string): Promise<string> {
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-5",
+      model: "gpt-4o",
       messages: [
         {
           role: "system",

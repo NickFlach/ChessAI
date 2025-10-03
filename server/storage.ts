@@ -1,5 +1,16 @@
-import { type User, type InsertUser, type MusicGeneration, type InsertMusicGeneration, type ImageGeneration, type InsertImageGeneration } from "@shared/schema";
-import { randomUUID } from "crypto";
+import { 
+  users,
+  musicGenerations,
+  imageGenerations,
+  type User, 
+  type InsertUser, 
+  type MusicGeneration, 
+  type InsertMusicGeneration, 
+  type ImageGeneration, 
+  type InsertImageGeneration 
+} from "@shared/schema";
+import { db } from "./db";
+import { eq, desc } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -17,115 +28,122 @@ export interface IStorage {
   getUserImageGenerations(userId?: string, limit?: number): Promise<ImageGeneration[]>;
 }
 
-export class MemStorage implements IStorage {
-  private users: Map<string, User>;
-  private musicGenerations: Map<string, MusicGeneration>;
-  private imageGenerations: Map<string, ImageGeneration>;
-
-  constructor() {
-    this.users = new Map();
-    this.musicGenerations = new Map();
-    this.imageGenerations = new Map();
-  }
-
+export class DatabaseStorage implements IStorage {
   async getUser(id: string): Promise<User | undefined> {
-    return this.users.get(id);
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user || undefined;
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
-    );
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user || undefined;
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const id = randomUUID();
-    const user: User = { ...insertUser, id };
-    this.users.set(id, user);
+    const [user] = await db
+      .insert(users)
+      .values(insertUser)
+      .returning();
     return user;
   }
 
   async createMusicGeneration(generation: InsertMusicGeneration & { userId?: string }): Promise<MusicGeneration> {
-    const id = randomUUID();
-    const musicGeneration: MusicGeneration = {
-      ...generation,
-      id,
-      userId: generation.userId || null,
-      style: generation.style || null,
-      title: generation.title || null,
-      model: generation.model || "V5",
-      instrumental: generation.instrumental ?? false,
-      duration: generation.duration || null,
-      status: "pending",
-      audioUrl: null,
-      imageUrl: null,
-      taskId: null,
-      metadata: null,
-      createdAt: new Date(),
-      completedAt: null,
-    };
-    this.musicGenerations.set(id, musicGeneration);
+    const [musicGeneration] = await db
+      .insert(musicGenerations)
+      .values({
+        prompt: generation.prompt,
+        style: generation.style || null,
+        title: generation.title || null,
+        model: generation.model || "V5",
+        instrumental: generation.instrumental ?? false,
+        duration: generation.duration || null,
+        userId: generation.userId || null,
+        metadata: null,
+      })
+      .returning();
     return musicGeneration;
   }
 
   async getMusicGeneration(id: string): Promise<MusicGeneration | undefined> {
-    return this.musicGenerations.get(id);
+    const [musicGeneration] = await db
+      .select()
+      .from(musicGenerations)
+      .where(eq(musicGenerations.id, id));
+    return musicGeneration || undefined;
   }
 
   async updateMusicGeneration(id: string, updates: Partial<MusicGeneration>): Promise<MusicGeneration | undefined> {
-    const existing = this.musicGenerations.get(id);
-    if (!existing) return undefined;
-    
-    const updated = { ...existing, ...updates };
-    this.musicGenerations.set(id, updated);
-    return updated;
+    const [updated] = await db
+      .update(musicGenerations)
+      .set(updates)
+      .where(eq(musicGenerations.id, id))
+      .returning();
+    return updated || undefined;
   }
 
   async getUserMusicGenerations(userId?: string, limit: number = 50): Promise<MusicGeneration[]> {
-    const generations = Array.from(this.musicGenerations.values());
-    const filtered = userId ? generations.filter(g => g.userId === userId) : generations;
-    return filtered
-      .sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0))
-      .slice(0, limit);
+    if (userId) {
+      return await db
+        .select()
+        .from(musicGenerations)
+        .where(eq(musicGenerations.userId, userId))
+        .orderBy(desc(musicGenerations.createdAt))
+        .limit(limit);
+    }
+    
+    return await db
+      .select()
+      .from(musicGenerations)
+      .orderBy(desc(musicGenerations.createdAt))
+      .limit(limit);
   }
 
   async createImageGeneration(generation: InsertImageGeneration & { userId?: string }): Promise<ImageGeneration> {
-    const id = randomUUID();
-    const imageGeneration: ImageGeneration = {
-      ...generation,
-      id,
-      userId: generation.userId || null,
-      title: generation.title || null,
-      musicGenerationId: generation.musicGenerationId || null,
-      status: "pending",
-      imageUrl: null,
-      createdAt: new Date(),
-      completedAt: null,
-    };
-    this.imageGenerations.set(id, imageGeneration);
+    const [imageGeneration] = await db
+      .insert(imageGenerations)
+      .values({
+        prompt: generation.prompt,
+        title: generation.title || null,
+        musicGenerationId: generation.musicGenerationId || null,
+        userId: generation.userId || null,
+      })
+      .returning();
     return imageGeneration;
   }
 
   async getImageGeneration(id: string): Promise<ImageGeneration | undefined> {
-    return this.imageGenerations.get(id);
+    const [imageGeneration] = await db
+      .select()
+      .from(imageGenerations)
+      .where(eq(imageGenerations.id, id));
+    return imageGeneration || undefined;
   }
 
   async updateImageGeneration(id: string, updates: Partial<ImageGeneration>): Promise<ImageGeneration | undefined> {
-    const existing = this.imageGenerations.get(id);
-    if (!existing) return undefined;
-    
-    const updated = { ...existing, ...updates };
-    this.imageGenerations.set(id, updated);
-    return updated;
+    const [updated] = await db
+      .update(imageGenerations)
+      .set(updates)
+      .where(eq(imageGenerations.id, id))
+      .returning();
+    return updated || undefined;
   }
 
   async getUserImageGenerations(userId?: string, limit: number = 50): Promise<ImageGeneration[]> {
-    const generations = Array.from(this.imageGenerations.values());
-    const filtered = userId ? generations.filter(g => g.userId === userId) : generations;
-    return filtered
-      .sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0))
-      .slice(0, limit);
+    if (userId) {
+      return await db
+        .select()
+        .from(imageGenerations)
+        .where(eq(imageGenerations.userId, userId))
+        .orderBy(desc(imageGenerations.createdAt))
+        .limit(limit);
+    }
+    
+    return await db
+      .select()
+      .from(imageGenerations)
+      .orderBy(desc(imageGenerations.createdAt))
+      .limit(limit);
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();
