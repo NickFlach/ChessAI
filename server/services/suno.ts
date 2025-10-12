@@ -25,6 +25,48 @@ async function withRetry<T>(fn: () => Promise<T>, opts: { attempts?: number; bas
   throw lastErr;
 }
 
+function createLimiter(opts: { concurrency: number; minIntervalMs: number }) {
+  let active = 0;
+  let lastStart = 0;
+  const q: Array<() => Promise<void>> = [];
+
+  const schedule = () => {
+    if (active >= opts.concurrency) return;
+    const job = q.shift();
+    if (!job) return;
+    const now = Date.now();
+    const wait = Math.max(0, opts.minIntervalMs - (now - lastStart));
+    active++;
+    setTimeout(async () => {
+      lastStart = Date.now();
+      try {
+        await job();
+      } finally {
+        active--;
+        schedule();
+      }
+    }, wait);
+  };
+
+  return {
+    run<T>(task: () => Promise<T>): Promise<T> {
+      return new Promise<T>((resolve, reject) => {
+        q.push(async () => {
+          try {
+            const res = await task();
+            resolve(res);
+          } catch (e) {
+            reject(e);
+          }
+        });
+        schedule();
+      });
+    }
+  };
+}
+
+const sunoLimiter = createLimiter({ concurrency: 2, minIntervalMs: 200 });
+
 export interface SunoGenerationParams {
   prompt: string;
   style?: string;
@@ -67,13 +109,13 @@ export async function generateMusic(params: SunoGenerationParams): Promise<SunoG
       weirdnessConstraint: params.weirdnessConstraint || 0.50,
     };
 
-    const response = await withRetry(() => axios.post(`${SUNO_API_URL}/generate`, requestData, {
+    const response = await withRetry(() => sunoLimiter.run(() => axios.post(`${SUNO_API_URL}/generate`, requestData, {
       headers: {
         'Authorization': `Bearer ${SUNO_API_KEY}`,
         'Content-Type': 'application/json'
       },
       timeout: 30000, // 30 second timeout
-    }));
+    })));
 
     const data = (response as any).data;
     
@@ -97,12 +139,12 @@ export async function generateMusic(params: SunoGenerationParams): Promise<SunoG
 
 export async function checkGenerationStatus(taskId: string): Promise<SunoGenerationResult> {
   try {
-    const response = await withRetry(() => axios.get(`${SUNO_API_URL}/status/${taskId}`, {
+    const response = await withRetry(() => sunoLimiter.run(() => axios.get(`${SUNO_API_URL}/status/${taskId}`, {
       headers: {
         'Authorization': `Bearer ${SUNO_API_KEY}`,
       },
       timeout: 10000,
-    }));
+    })));
 
     const data = (response as any).data;
     
@@ -132,10 +174,10 @@ export async function checkGenerationStatus(taskId: string): Promise<SunoGenerat
 
 export async function downloadAudio(audioUrl: string): Promise<Buffer> {
   try {
-    const response = await withRetry(() => axios.get(audioUrl, {
+    const response = await withRetry(() => sunoLimiter.run(() => axios.get(audioUrl, {
       responseType: 'arraybuffer',
       timeout: 60000, // 60 second timeout for downloads
-    }), { attempts: 2 });
+    })), { attempts: 2 });
     
     return Buffer.from((response as any).data);
   } catch (error) {
