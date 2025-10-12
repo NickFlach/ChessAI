@@ -53,6 +53,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updated = await storage.updateMusicGeneration(musicGeneration.id, {
         taskId: sunoResult.taskId,
         status: "processing",
+        progress: 5,
+        statusDetail: "processing",
       });
 
       res.json(updated);
@@ -86,12 +88,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
             duration: sunoStatus.duration,
             metadata: sunoStatus.metadata,
             completedAt: new Date(),
+            progress: 100,
+            statusDetail: "completed",
           });
           res.json(updated);
         } else {
           // Update status
+          const next = Math.min((musicGeneration.progress || 0) + (sunoStatus.status === "processing" ? 5 : 2), 95);
           const updated = await storage.updateMusicGeneration(id, {
             status: sunoStatus.status,
+            progress: next,
+            statusDetail: sunoStatus.status,
           });
           res.json(updated);
         }
@@ -161,13 +168,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
               duration: sunoStatus.duration,
               metadata: sunoStatus.metadata,
               completedAt: new Date(),
+              progress: 100,
+              statusDetail: "completed",
             }))!;
             send("status", updated);
             clearInterval(interval);
             return res.end();
           } else {
+            const next = Math.min((music.progress || 0) + (sunoStatus.status === "processing" ? 5 : 2), 95);
             updated = (await storage.updateMusicGeneration(id, {
               status: sunoStatus.status,
+              progress: next,
+              statusDetail: sunoStatus.status,
             }))!;
             send("status", updated);
           }

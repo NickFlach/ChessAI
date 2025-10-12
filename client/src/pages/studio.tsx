@@ -7,6 +7,7 @@ import { ImageGallery } from "@/components/image-gallery";
 import { GenerationHistory } from "@/components/generation-history";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { Progress } from "@/components/ui/progress";
 import type { MusicGeneration, ImageGeneration } from "@shared/schema";
 
 export default function Studio() {
@@ -249,6 +250,19 @@ export default function Studio() {
             musicGeneration={currentMusic}
             className="hover:shadow-xl transition-shadow" 
           />
+
+          {currentMusic && currentMusic.status !== "completed" && currentMusic.status !== "failed" && (
+            <div className="p-4 rounded-lg border border-border bg-card">
+              <div className="mb-2 flex items-center justify-between text-sm">
+                <span>Generating music…</span>
+                <span>{Math.max(0, Math.min(100, currentMusic.progress || 0))}%</span>
+              </div>
+              <Progress value={Math.max(0, Math.min(100, currentMusic.progress || 0))} />
+              {currentMusic.statusDetail && (
+                <div className="mt-2 text-xs text-muted-foreground">{currentMusic.statusDetail}</div>
+              )}
+            </div>
+          )}
 
           {/* Image Gallery Section */}
           <ImageGallery 

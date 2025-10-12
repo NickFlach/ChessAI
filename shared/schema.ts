@@ -19,6 +19,8 @@ export const musicGenerations = pgTable("music_generations", {
   instrumental: boolean("instrumental").default(false),
   duration: integer("duration"), // in seconds
   status: text("status").notNull().default("pending"), // pending, processing, completed, failed
+  progress: integer("progress").notNull().default(0),
+  statusDetail: text("status_detail"),
   audioUrl: text("audio_url"),
   imageUrl: text("image_url"),
   taskId: text("task_id"),
@@ -48,6 +50,8 @@ export const insertMusicGenerationSchema = createInsertSchema(musicGenerations).
   id: true,
   userId: true,
   status: true,
+  progress: true,
+  statusDetail: true,
   audioUrl: true,
   imageUrl: true,
   taskId: true,
