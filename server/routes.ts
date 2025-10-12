@@ -103,10 +103,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } else {
           // Update status
           const next = Math.min((musicGeneration.progress || 0) + (sunoStatus.status === "processing" ? 5 : 2), 95);
+          const detail = sunoStatus.status === "processing" ? "rendering audio" : "queued";
           const updated = await storage.updateMusicGeneration(id, {
             status: sunoStatus.status,
             progress: next,
-            statusDetail: sunoStatus.status,
+            statusDetail: detail,
           });
           res.json(updated);
         }
@@ -184,10 +185,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             return res.end();
           } else {
             const next = Math.min((music.progress || 0) + (sunoStatus.status === "processing" ? 5 : 2), 95);
+            const detail = sunoStatus.status === "processing" ? "rendering audio" : "queued";
             updated = (await storage.updateMusicGeneration(id, {
               status: sunoStatus.status,
               progress: next,
-              statusDetail: sunoStatus.status,
+              statusDetail: detail,
             }))!;
             send("status", updated);
           }
@@ -219,6 +221,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         'Content-Type': 'audio/mpeg',
         'Content-Disposition': `attachment; filename="${musicGeneration.title || 'generated-music'}.mp3"`,
         'Content-Length': audioBuffer.length,
+        'Cache-Control': 'public, max-age=31536000, immutable',
       });
       
       res.send(audioBuffer);
@@ -295,6 +298,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         'Content-Type': 'image/png',
         'Content-Disposition': `attachment; filename="${imageGeneration.title || 'generated-image'}.png"`,
         'Content-Length': buffer.length,
+        'Cache-Control': 'public, max-age=31536000, immutable',
       });
       
       res.send(buffer);

@@ -22,6 +22,9 @@ async function withRetry<T>(fn: () => Promise<T>, opts: { attempts?: number; bas
       const delay = base * Math.pow(2, i) + jitter;
       await new Promise(r => setTimeout(r, delay));
     }
+  }
+  throw lastErr;
+}
 
 function createLimiter(opts: { concurrency: number; minIntervalMs: number }) {
   let active = 0;
@@ -64,9 +67,6 @@ function createLimiter(opts: { concurrency: number; minIntervalMs: number }) {
 }
 
 const openaiLimiter = createLimiter({ concurrency: 3, minIntervalMs: 100 });
-  }
-  throw lastErr;
-}
 
 export interface GenerateImageParams {
   prompt: string;
@@ -84,7 +84,7 @@ export async function generateImage(params: GenerateImageParams): Promise<ImageG
     let enhancedPrompt = params.prompt;
     
     if (params.musicContext) {
-      const enhancementResponse = await withRetry(() => openaiLimiter.run(() => openai.chat.completions.create({
+      const enhancementResponse: any = await withRetry(() => openaiLimiter.run(() => openai.chat.completions.create({
         model: "gpt-4o",
         messages: [
           {
@@ -97,18 +97,18 @@ export async function generateImage(params: GenerateImageParams): Promise<ImageG
           }
         ],
         max_completion_tokens: 100,
-      })) as any;
+      })));
 
-      enhancedPrompt = (enhancementResponse as any).choices[0].message.content || params.prompt;
+      enhancedPrompt = enhancementResponse.choices[0].message.content || params.prompt;
     }
 
-    const response = await withRetry(() => openaiLimiter.run(() => openai.images.generate({
+    const response: any = await withRetry(() => openaiLimiter.run(() => openai.images.generate({
       model: "dall-e-3",
       prompt: enhancedPrompt,
       n: 1,
       size: "1024x1024",
       quality: "standard",
-    }))) as any;
+    })));
 
     if (!response.data || !response.data[0]) {
       throw new Error("No image data returned from OpenAI");
@@ -126,7 +126,7 @@ export async function generateImage(params: GenerateImageParams): Promise<ImageG
 
 export async function enhanceMusicPrompt(prompt: string): Promise<string> {
   try {
-    const response = await withRetry(() => openaiLimiter.run(() => openai.chat.completions.create({
+    const response: any = await withRetry(() => openaiLimiter.run(() => openai.chat.completions.create({
       model: "gpt-4o",
       messages: [
         {
@@ -139,9 +139,9 @@ export async function enhanceMusicPrompt(prompt: string): Promise<string> {
         }
       ],
       max_completion_tokens: 150,
-    })) as any;
+    })));
 
-    return (response as any).choices[0].message.content || prompt;
+    return response.choices[0].message.content || prompt;
   } catch (error: any) {
     console.error("OpenAI prompt enhancement error:", error);
     return prompt; // Fallback to original prompt
