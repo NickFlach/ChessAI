@@ -4,7 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Heart, Copy, Check, ExternalLink, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+<<<<<<< HEAD
 const ETH_ADDRESS = import.meta.env.VITE_DONATION_ETH_ADDRESS || "";
+=======
+const ETH_ADDRESS = "0x618d855C2F32f1C9343624111b8bEd20eEccdf53";
+>>>>>>> a9bb145361fa3dc4644d162df029856260dd57dc
 
 interface SupportBannerProps {
   className?: string;
